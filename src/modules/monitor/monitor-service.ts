@@ -2,6 +2,7 @@ import { spawn } from "child_process";
 import readline from "readline";
 import {  ProcessEventItem, TopColumn, TopProcess } from "./types";
 import { io } from "../../server";
+import { isValidPositiveNumber } from "../../utils/number";
 
 export default class MonitorService {
   private reader?: readline.Interface;
@@ -14,15 +15,15 @@ export default class MonitorService {
     time: -1,
   };
 
-  public async start(delay: number = 1) {
-    console.log("Starting Process Monitor Service...");
+  public async start(delayStr: string = '1') {
+    const delay = isValidPositiveNumber(delayStr) ? Number(delayStr) : 1;
     this.stop();
 
     const topParams: string[] = [];
 
     switch (process.platform) {
       case "darwin":
-        topParams.push("-s", delay < 1 ? "1" : delay.toFixed());
+        topParams.push("-s", (delay < 1 && delay !== 0) ? "1" : delay.toFixed());
         break;
       case "linux":
         topParams.push("-b", "-d", String(delay));
@@ -31,6 +32,7 @@ export default class MonitorService {
         console.error("Platform not supported for top command");
         break;
     }
+
 
     const topProcess = spawn("top", topParams);
     this.reader = readline.createInterface({ input: topProcess.stdout });

@@ -26,6 +26,6 @@ server.listen(PORT, () => console.log(`Server is running on https://localhost:${
 const monitor = new MonitorService();
 
 monitor.setFilter([]) // ['node', 'python', 'java']
-monitor.start(0.3);
+monitor.start(process.env.MONITOR_DELAY || '1');
 
 export { io };
