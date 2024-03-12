@@ -1,4 +1,4 @@
-import { Server } from "socket.io";
+import { Server, Socket } from "socket.io";
 import https from 'https'
 import fs from 'fs'
 import "dotenv/config";
@@ -19,11 +19,17 @@ const io = new Server(server, {
   },
 });
 
+const monitor = new MonitorService();
+
+io.on("connection", (socket: Socket) => {
+  monitor.handleNewConnection(socket.id);
+  console.info(`User connected: ${socket.id}`);
+});
+
 const PORT = process.env.PORT ?? 3000;
 
 server.listen(PORT, () => console.log(`Server is running on https://localhost:${PORT}\n\n`));
 
-const monitor = new MonitorService();
 
 monitor.setFilter([]) // ['node', 'python', 'java']
 monitor.start(process.env.MONITOR_DELAY || '1');

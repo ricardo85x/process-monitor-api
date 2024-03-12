@@ -1,4 +1,4 @@
-import { spawn } from "child_process";
+import { spawn, spawnSync } from "child_process";
 import readline from "readline";
 import {  ProcessEventItem, TopColumn, TopProcess } from "./types";
 import { io } from "../../server";
@@ -37,6 +37,34 @@ export default class MonitorService {
     const topProcess = spawn("top", topParams);
     this.reader = readline.createInterface({ input: topProcess.stdout });
     this.reader.on("line", this.readLine);
+  }
+
+  public handleNewConnection(sessionId: string) {
+      const process = this.current
+        .filter((p) =>
+          this.filters.length
+            ? this.filters.some((filter) => p.command.includes(filter))
+            : true
+        )
+        .map((process) => ({
+          id: process.pid,
+          date: new Date(),
+          name: process.command,
+        }));
+
+      const processStartTime = this.getTimeFromProcessIds(
+        process.map((p) => p.id)
+      );
+
+      const newProcess = process.map((p, i) => ({
+        id: p.id,
+        name: p.name,
+        date: processStartTime[i] || p.date,
+      }));
+
+      if (newProcess.length) {
+        this.emiEventTo(sessionId, "currentProcess", newProcess);
+      }
   }
 
   public setFilter(filters: string[]) {
@@ -130,7 +158,36 @@ export default class MonitorService {
 
   private emitEvent(eventName: string, data: ProcessEventItem[]) {
     io.emit(eventName, data);
-    console.log(eventName, data)
+    console.log("sending", eventName, data)
+  }
+
+  private emiEventTo(sessionId: string, eventName: string, data: ProcessEventItem[]) {
+    io.to(sessionId).emit(eventName, data);
+    console.log("sending to", sessionId, eventName, data)
+  }
+
+  private getTimeFromProcessIds(pidIds: string[]): Date[]  {
+    const pidStrList = pidIds.join(",");
+    const { stdout, error } = spawnSync("ps", [
+      "-p",
+      pidStrList,
+      "-o",
+      "lstart",
+    ]);
+
+    if (error || stdout.toString().trim() === "") {
+      return []
+    }
+
+    const lines = stdout.toString().trim().split("\n");
+    const startTimes: Date[] = [];
+
+    for (let i = 1; i < lines.length; i++) {
+      const startTimeStr = lines[i].trim()
+      const startTime = new Date(startTimeStr);
+      startTimes.push(startTime);
+    }
+    return startTimes;
   }
 
   private stop() {
